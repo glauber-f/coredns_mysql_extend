@@ -159,7 +159,36 @@ func (m *Mysql) onStartup() error {
 	m.loadLocalData()
 	// Create tables
 	m.createTables()
+	// Start update records cache loop
+	go m.runRecordsUpdater()
 	return nil
+}
+
+func (m *Mysql) runRecordsUpdater() {
+	for {
+		m.updateRecordsCache()
+		time.Sleep(m.successHeartbeatTime)
+	}
+}
+
+func (m *Mysql) updateRecordsCache() {
+	rows, err := m.db.Query("select distinct concat(r.hostname , '.', z.zone_name) from records r, zones z where r.zone_id = z.id;")
+	if err != nil {
+		logger.Errorf("Failed to query records: %s", err)
+		return
+	} else {
+		for rows.Next() {
+			var record record
+			err := rows.Scan(&record.id, &record.zoneID, &record.name, &record.qType, &record.data, &record.ttl)
+			if err != nil {
+				logger.Error(err)
+				continue
+			}
+			m.mutex.Lock()
+			m.recordsCache[record.fqdn+zoneSeparator+record.zoneName+zoneSeparator+record.qType] = true
+			m.mutex.Unlock()
+		}
+	}
 }
 
 func (m *Mysql) onShutdown() error {
