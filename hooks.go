@@ -172,20 +172,21 @@ func (m *Mysql) runRecordsUpdater() {
 }
 
 func (m *Mysql) updateRecordsCache() {
-	rows, err := m.db.Query("select distinct concat(r.hostname , '.', z.zone_name) from records r, zones z where r.zone_id = z.id;")
+	rows, err := m.db.Query("select distinct concat(r.hostname , '.', z.zone_name) as fqdn from records r, zones z where r.zone_id = z.id;")
 	if err != nil {
 		logger.Errorf("Failed to query records: %s", err)
 		return
 	} else {
 		for rows.Next() {
-			var record record
-			err := rows.Scan(&record.id, &record.zoneID, &record.name, &record.qType, &record.data, &record.ttl)
+
+			var fqdn string
+			err := rows.Scan(&fqdn)
 			if err != nil {
 				logger.Error(err)
-				continue
 			}
+
 			m.mutex.Lock()
-			m.recordsCache[record.fqdn+zoneSeparator+record.zoneName+zoneSeparator+record.qType] = true
+			m.recordsCache[fqdn] = true
 			m.mutex.Unlock()
 		}
 	}
