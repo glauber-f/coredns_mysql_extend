@@ -185,6 +185,10 @@ func (m *Mysql) updateRecordsCache() {
 				logger.Error(err)
 			}
 
+			if fqdn == "" {
+				continue
+			}
+
 			m.mutex.Lock()
 			m.recordsCache[fqdn] = true
 			m.mutex.Unlock()
