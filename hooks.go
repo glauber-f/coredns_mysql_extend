@@ -151,16 +151,18 @@ func (m *Mysql) onStartup() error {
 
 	m.db = db
 
+	m.recordsCache = make(map[string]bool)
+
 	// Start rePing loop
 	go m.rePing()
 	// start reGetZone loop
 	go m.reGetZone()
+	// Start update records cache loop
+	go m.runRecordsUpdater()
 	// Load local file data
 	m.loadLocalData()
 	// Create tables
 	m.createTables()
-	// Start update records cache loop
-	go m.runRecordsUpdater()
 	return nil
 }
 
@@ -171,7 +173,14 @@ func (m *Mysql) runRecordsUpdater() {
 	}
 }
 
+func (m *Mysql) clearRecordsCache() {
+	m.mutex.Lock()
+	m.recordsCache = make(map[string]bool)
+	m.mutex.Unlock()
+}
+
 func (m *Mysql) updateRecordsCache() {
+	m.clearRecordsCache()
 	rows, err := m.db.Query("select distinct concat(r.hostname , '.', z.zone_name) as fqdn from records r, zones z where r.zone_id = z.id;")
 	if err != nil {
 		logger.Errorf("Failed to query records: %s", err)
